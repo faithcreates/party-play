@@ -5,16 +5,15 @@ class SongsController < ApplicationController
   protect_from_forgery except: [:add, :skip]
 
   def add
-    info = write_file params
-    save_info info
-    render :json => {status: 'ok', info: info}
+    song = write_file params
+    save_info song.to_hash
+    render :json => {status: 'ok', info: song}
   end
 
   def add_url
     render :json => {:status => 'ng'} and return if params[:url].nil?
-
-    info = download_file_asynchronously(params)
-    render :json => {status: 'ok', info: info}
+    song = download_file_asynchronously(params)
+    render :json => {status: 'ok', info: song}
   end
 
   def skip
@@ -47,6 +46,7 @@ class SongsController < ApplicationController
   end
 
   private
+
   def dir
     File.expand_path("public/music", Rails.root).tap(&FileUtils.method(:mkdir_p))
   end
@@ -68,11 +68,26 @@ class SongsController < ApplicationController
     params.slice(:title, :artist).each{|k,v| info[k] = CGI.unescape(v)}
     info['artwork'] = "#{url}.artwork.jpg"
     info
+
+    Song.new(
+      artist: info[:artist],
+      artwork: info['artwork'],
+      path: info[:path],
+      title: info[:title],
+      url: info[:url]
+    )
   end
 
   def download_file_asynchronously(params)
     url = params[:url]
     json = JSON::parse(`youtube-dl --dump-json "#{url}"`)
+
+    # set path & url later
+    song = Song.new(
+      artist: json['uploader'],
+      artwork: json['thumbnail'],
+      title: json['title']
+    )
 
     Process::fork do
       download_command = "youtube-dl -x"
@@ -92,16 +107,14 @@ class SongsController < ApplicationController
         audio_filename = filename if File.exists?("#{dir}/#{filename}")
       end
 
-      title = json["title"]
-      artist = json["uploader"]
-      path = File.expand_path(audio_filename, dir)
-      url =  "http://#{request.host}:#{request.port}/music/#{audio_filename}"
-      artwork_url = json["thumbnail"]
+      # set path & url
+      song.path = File.expand_path(audio_filename, dir)
+      song.url = "http://#{request.host}:#{request.port}/music/#{audio_filename}"
 
-      save_info(title: title, artist: artist, path: path, url: url, artwork: artwork_url)
+      save_info(song.to_hash)
     end
 
-    json
+    song
   end
 
   def save_info(info)
