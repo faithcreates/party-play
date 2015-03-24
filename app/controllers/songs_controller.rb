@@ -19,7 +19,7 @@ class SongsController < ApplicationController
 
   def skip
     Redis.current.publish 'skip', :skip
-    render text: 'ok'
+    render :json => {status: 'ok'}
   end
 
   def index
