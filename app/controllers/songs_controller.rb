@@ -7,6 +7,7 @@ class SongsController < ApplicationController
   def add
     info = write_file params
     save_info info
+    render :json => {status: 'ok', info: info}
   end
 
   def add_url
