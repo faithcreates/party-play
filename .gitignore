@@ -17,3 +17,5 @@
 /public/music
 
 /config/account.yml
+
+/vendor/bundle
